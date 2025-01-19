@@ -1,3 +1,4 @@
+from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -16,12 +17,17 @@ EMAIL = os.getenv("EMAIL")
 PASSWORD = os.getenv("PASSWORD")
 URL = os.getenv("URL")
 
+NEXT_WEEK_BUTTON = "fc-next-button fc-button fc-button-primary"
+
 
 driver = webdriver.Chrome()
 wait = WebDriverWait(driver, 40)
 
+
+
+
 try:
-    
+
     driver.get(URL)
 
     
@@ -55,6 +61,15 @@ try:
     else:
         print("Login button is not visible.")
 
+    # now the user is logged in
+
+
+
+
+
+
+    next_week_button = wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "fc-next-button")))
+    next_week_button.click()
 
     table = wait.until(EC.presence_of_element_located((By.CLASS_NAME, "fc-list-table")))
 
@@ -63,30 +78,63 @@ try:
 
 
     data = []
+    current_date = None  
+
+
     for row in rows:
-        
-        cells = row.find_elements(By.TAG_NAME, "td")  
-        
-        data.append([cell.text for cell in cells])
-    
-    
+
+        heading = row.find_elements(By.TAG_NAME, "th")
+        if heading:
+            try:
+
+                dateField = heading[0].find_element(By.CLASS_NAME, "fc-list-day-side-text")
+                date_string = dateField.text  #"13 January 2025"
+                current_date = datetime.strptime(date_string, "%d %B %Y").strftime("%Y-%m-%d")  # Format as YYYY-MM-DD
+            except Exception as e:
+                print(f"Error parsing date: {e}")
+                continue
+        else:
+
+            cells = row.find_elements(By.TAG_NAME, "td")
+            if cells and current_date:  # Ensure we have a valid date for the event
+                event_time = cells[0].text.strip() if len(cells) > 0 else None
+                event_title = cells[2].text.strip() if len(cells) > 2 else None
+                
+
+                data.append({
+                    "date": current_date,
+                    "time": event_time,
+                    "title": event_title
+                })
+
+
     for row in data:
         print(row)
+    #adding to calendar process 
     calendar = Calendar()
 
 
     for item in data:
         if not item:
             continue  
-        time_range, _, description = item
-        start_time, end_time = time_range.split(" - ")
+
+        date, time, title = item['date'], item['time'], item['title']
 
 
         event = Event()
-        event.name = description  
-        event.begin = f"2025-01-13 {start_time}"  
-        event.end = f"2025-01-13 {end_time}"      
+        event.name = title        # Parse the date
+        date_object = datetime.strptime(date, "%Y-%m-%d")
 
+        start_time, end_time = time.split(" - ")
+
+
+        date_string = date_object.strftime("%Y-%m-%d")  # Convert date_object to string
+        start_datetime = datetime.strptime(f"{date_string} {start_time}", "%Y-%m-%d %H:%M")
+        end_datetime = datetime.strptime(f"{date_string} {end_time}", "%Y-%m-%d %H:%M")
+
+
+        event.begin = start_datetime
+        event.end = end_datetime
 
         calendar.events.add(event)
 
@@ -98,3 +146,6 @@ try:
 finally:
 
     driver.quit()
+
+
+
